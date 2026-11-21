@@ -1,0 +1,19 @@
+{
+  "name": "vouch-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test:api": "node --test tests/api.test.mjs",
+    "db:migrate": "node server/migrate.mjs",
+    "start": "node server/start.mjs",
+    "test": "npm run test:api && python3 -m unittest discover -s tests"
+  },
+  "dependencies": {
+    "@netlify/database": "2.0.3",
+    "pg": "8.22.0"
+  }
+}
