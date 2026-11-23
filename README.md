@@ -2,6 +2,10 @@
 
 Vouch turns a learner’s Python function into a short code-reading exercise. Run the examples, examine a one-line mutation and predict its result or find an input that exposes the change. Each answer has an executable explanation.
 
+[Open Vouch](https://vouch-code-lab.netlify.app/)
+
+![Vouch on Netlify](docs/screens/production.jpg)
+
 ## Try it
 
 Open the library and select **Count the positives**. Run the supplied example, then start a round. For a second attempt, change the implementation while preserving its behavior. The next round is generated from the edited function.
