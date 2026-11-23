@@ -1,4 +1,5 @@
 import pg from "pg";
+import { readFileSync } from "node:fs";
 let pool;
 
 export function database() {
@@ -12,8 +13,24 @@ export function database() {
       { status: 503 },
     );
   }
+  const url = new URL(connectionString);
+  const config = { connectionString };
+  if (url.hostname.endsWith(".pooler.supabase.com")) {
+    // pg parses sslmode after the explicit TLS options. Remove it so the provider CA is retained.
+    url.searchParams.delete("sslmode");
+    config.connectionString = url.href;
+    config.ssl = {
+      ca: readFileSync(
+        process.env.LAMBDA_TASK_ROOT
+          ? process.env.LAMBDA_TASK_ROOT + "/server/supabase-root.crt"
+          : new URL("./supabase-root.crt", import.meta.url),
+        "utf8",
+      ),
+      rejectUnauthorized: true,
+    };
+  }
   pool ??= new pg.Pool({
-    connectionString,
+    ...config,
     max: 3,
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 10000,
