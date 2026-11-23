@@ -162,6 +162,14 @@ SWAPS = {ast.Eq: ast.NotEq, ast.NotEq: ast.Eq, ast.Lt:ast.LtE, ast.LtE:ast.Lt,
          ast.Add:ast.Sub, ast.Sub:ast.Add, ast.Mult:ast.FloorDiv, ast.FloorDiv:ast.Mult}
 
 def replacements(node):
+    if isinstance(node,ast.Call) and isinstance(node.func,ast.Name) and node.func.id in ("min","max"):
+        n=copy.deepcopy(node)
+        n.func.id="max" if node.func.id=="min" else "min"
+        yield n
+    if isinstance(node, (ast.If,ast.IfExp)):
+        n=copy.deepcopy(node)
+        n.test=ast.UnaryOp(ast.Not(), n.test)
+        yield n
     if isinstance(node,ast.Compare):
         for i,op in enumerate(node.ops):
             if type(op) in SWAPS:

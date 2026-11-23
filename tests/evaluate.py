@@ -1,5 +1,7 @@
 """Run the six-by-ten implementation evaluation on this host."""
+import ast
 import json
+import copy
 import statistics
 import sys
 import time
@@ -10,6 +12,30 @@ PUBLIC=Path(__file__).resolve().parents[1]/"public"
 sys.path.insert(0,str(PUBLIC))
 import engine
 
+def independent_fn(code, name):
+    # Only the authored evaluation fixtures and their retained mutations enter here.
+    env = {}
+    exec(compile(code, "<evaluation-fixture>", "exec"), env)
+    def run(call):
+        arguments = [ast.literal_eval(arg) for arg in ast.parse(call,mode="eval").body.args]
+        try:
+            return repr(env[name](*copy.deepcopy(arguments)))
+        except Exception as error:
+            return f"raises {type(error).__name__}"
+    return run
+
+def check_answers(source, problem, probes):
+    original = independent_fn(source,problem["functionName"])
+    for q in probes:
+        mutant=independent_fn(q["code"],problem["functionName"])
+        assert len(set(q["options"]))==4
+        answer=q["options"][q["correctIndex"]]
+        if q["kind"]=="Breaker":
+            assert [choice for choice in q["options"] if original(choice)!=mutant(choice)]==[answer]
+        else:
+            call=q["prompt"][len("What does "):-len(" return or raise?")]
+            assert mutant(call)==answer and original(call)!=answer
+
 def main():
     data=[]
     for problem in json.loads((PUBLIC / "problems.json").read_text()):
@@ -18,6 +44,7 @@ def main():
             start=time.perf_counter()
             result=engine.practice(item)
             elapsed=(time.perf_counter()-start)*1000
+            check_answers(source,problem,result["probes"])
             expected=problem["tests"]+problem["cases"]
             func=engine.compile_fn(engine.parse(source,problem["functionName"]),problem["functionName"])
             assert all(engine.same(engine.invoke(func,c["args"]),("value",c["expected"])) for c in expected), (problem["id"],variant)
