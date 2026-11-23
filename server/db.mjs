@@ -1,15 +1,9 @@
-import { getConnectionString } from "@netlify/database";
 import pg from "pg";
 let pool;
 
 export function database() {
   if (pool) return pool;
-  let connectionString;
-  try {
-    connectionString = getConnectionString();
-  } catch {
-    connectionString = process.env.DATABASE_URL;
-  }
+  const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw Object.assign(
       new Error(

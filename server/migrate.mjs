@@ -9,7 +9,7 @@ try {
   await client.query(
     await readFile(
       new URL(
-        "../netlify/database/migrations/20261121133000_vouch.sql",
+        "../db/migrations/20261121133000_vouch.sql",
         import.meta.url,
       ),
       "utf8",

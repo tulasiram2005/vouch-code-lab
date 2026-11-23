@@ -15,7 +15,7 @@ npm ci
 npm start
 ```
 
-Open http://127.0.0.1:4173. For shared records, provide a private server-side DATABASE_URL and run `npm run db:migrate` before starting. Keep connection details out of Git. Native Netlify deployments use the managed database binding.
+Open http://127.0.0.1:4173. For shared records, provide a private server-side DATABASE_URL and run `npm run db:migrate` before starting. Keep connection details out of Git. Netlify Functions use the same server-only variable.
 
 ## How a round works
 

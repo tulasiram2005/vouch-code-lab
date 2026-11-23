@@ -10,10 +10,14 @@
     "test:api": "node --test tests/api.test.mjs",
     "db:migrate": "node server/migrate.mjs",
     "start": "node server/start.mjs",
-    "test": "npm run test:api && python3 -m unittest discover -s tests"
+    "test": "npm run test:api && python3 -m unittest discover -s tests",
+    "test:browser": "node tests/browser.mjs"
   },
   "dependencies": {
-    "@netlify/database": "2.0.3",
     "pg": "8.22.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "playwright": "1.65.1"
   }
 }
