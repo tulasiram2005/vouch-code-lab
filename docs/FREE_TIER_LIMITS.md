@@ -5,3 +5,5 @@ The connected Netlify team reported the Free plan on 21 November 2026. No paid u
 Netlify currently documents 300 monthly credits with a hard cap on its credit-based Free plan. Older accounts may have legacy terms. The dashboard identifies the actual team plan. Managed Netlify Database requires a credit-based plan, and its compute and traffic use the same included allowance.
 
 [Netlify billing](https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-credit-based-plans/) · [Managed database availability](https://docs.netlify.com/build/data-and-storage/netlify-database/)
+
+Production uses Supabase PostgreSQL in the dedicated vouch-code-lab project. Supabase quoted $0/month on 23 November 2026. The Netlify legacy Free team rejected its native database feature during the first build. The server connects to Supabase through its transaction pooler and a restricted database role. Application tables are in a private schema.
