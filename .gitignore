@@ -8,3 +8,12 @@ __pycache__/
 *.py[cod]
 .DS_Store
 coverage/
+
+# Local credentials, database snapshots and test TLS keys
+.pgpass
+.pg_service.conf
+*.key
+*.p12
+*.pfx
+*.dump
+*.pgdump

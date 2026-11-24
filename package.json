@@ -11,7 +11,8 @@
     "db:migrate": "node server/migrate.mjs",
     "start": "node server/start.mjs",
     "test": "npm run test:api && python3 -m unittest discover -s tests",
-    "test:browser": "node tests/browser.mjs"
+    "test:browser": "node tests/browser.mjs",
+    "test:live": "node tests/live.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "6.11.1",
