@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /v/
+Sitemap: https://vouch-code-lab.netlify.app/sitemap.xml
