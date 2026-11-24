@@ -58,6 +58,7 @@ export async function purgeExpired() {
     await client.query(
       "DELETE FROM attempts WHERE created_at < now() - interval '30 days'",
     );
+    await client.query("DELETE FROM revoked_records WHERE expires_at <= now()");
     await client.query("DELETE FROM sessions WHERE expires_at < now()");
     await client.query(
       "DELETE FROM rate_windows WHERE started_at < now() - interval '1 hour'",

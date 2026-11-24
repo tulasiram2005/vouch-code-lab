@@ -26,6 +26,7 @@ To run the database integration suite, set `TEST_DATABASE_URL` to a disposable P
 | POST /api/instructor/logout | Revoke the current session |
 | GET or POST /api/cohorts | List owned cohorts or create a cohort with a name and an assigned problem |
 | GET /api/cohorts/:id | Read a board for an owned cohort, capped at the newest 1,000 attempts |
+| POST /api/cohorts/:id/regenerate-code | Replace the owned cohort’s join code. Submit `currentCode` to prevent a stale tab from replacing a newly issued code. |
 
 ## Integrity and privacy
 

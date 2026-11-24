@@ -135,18 +135,21 @@ function options(choices, className = "choices") {
     "</div>"
   );
 }
-function home() {
-  const demo =
-    "def count_positive(nums):\n    count = 0\n    for n in nums:\n        if n >= 0:\n            count += 1\n    return count";
+async function home(visit) {
+  const problem = (await catalog()).find((item) => item.id === "count-positives");
+  if (visit !== state.visits) return;
+  const example = problem.tests.find(({args}) => args[0].includes(0) && args[0].some(n => n > 0));
+  const call = problem.functionName + "(" + JSON.stringify(example.args[0]).replaceAll(",", ", ") + ")";
+  const demo = problem.starter;
   main.innerHTML =
     '<div class="wrap"><section class="hero"><div>' +
     eyebrow("Python practice studio") +
     '<h1>Know the code <br><em>you ship.</em></h1><p class="lead">One small change to your Python. Five questions about what happens next. Find out how well you understand what you wrote.</p><div class="actions">' +
     action("Open the library", "library") +
-    '<a class="textlink" href="#/instructor">For instructors ↗</a></div></div><article class="demo" aria-label="Interactive code example"><div class="bar"><span class="file"><span class="dot"></span>count_positive.py</span><span class="tag">Live probe</span></div>' +
+    '<a class="textlink" href="#/instructor">For instructors ↗</a></div></div><article class="demo" aria-label="Interactive code example"><div class="bar"><span class="file"><span class="dot"></span>count_positives.py</span><span class="tag">Live example</span></div>' +
     codeView(demo, 4) +
-    '<div class="demo-foot"><div class="mini">Predict the return value</div><h2 class="question">What does it return for <code>[-1, 0, 2]</code>?</h2>' +
-    options(["1", "2", "3"]) +
+    '<div class="demo-foot"><div class="mini">Predict the return value</div><h2 class="question">What does <code>' + esc(call) + '</code> return?</h2>' +
+    options([example.expected - 1, example.expected, example.expected + 1]) +
     '<p id="demo-feedback" class="feedback" aria-live="polite">Choose an answer to test your read.</p></div></article></section><section class="method">' +
     eyebrow("The method") +
     '<h2>Inside a Vouch round.</h2><div class="steps"><article class="step"><div class="mini">01 / Write</div><div class="specimen"><span class="file">solution.py</span><span class="preview-lines"><b>def solve(x):</b>　 return x</span></div><h3>Start with your code.</h3><p>Pick a Python problem, write a function, and run the examples in your browser.</p></article><article class="step"><div class="mini">02 / Predict</div><div class="specimen"><code>n &gt; 0</code><span aria-hidden="true">→</span><span class="tag">n &gt;= 0</span></div><h3>Read the change.</h3><p>Study a small mutation. Predict its output or choose an input that exposes it.</p></article><article class="step"><div class="mini">03 / Review</div><div class="specimen"><div class="tape"><span class="tile hit">✓</span><span class="tile hit">✓</span><span class="tile miss">×</span><span class="tile hit">✓</span><span class="tile hit">✓</span></div></div><h3>See your reasoning.</h3><p>Review each answer and use the explanations to plan your next practice round.</p></article></div></section><div class="charter note">A round captures how you interpreted a specific change. Use the result to guide practice or start a conversation about your code.</div></div>';
@@ -161,8 +164,8 @@ function home() {
         message(
           "demo-feedback",
           Number(button.dataset.choice) === 1
-            ? "Correct. Both 0 and 2 satisfy n >= 0, so the function returns 2."
-            : "Trace 0 and 2 through the highlighted line. Both satisfy n >= 0, so the answer is 2.",
+            ? "Correct. Only 2 and 4 are strictly positive, so the function returns 2."
+            : "Zero does not pass value > 0. Only 2 and 4 contribute to the count.",
         );
       }),
   );
@@ -219,23 +222,28 @@ async function api(path, method = "GET", body, token) {
     );
   return json;
 }
-function testList(results) {
-  return results
-    .map(
-      (t) =>
-        '<div class="case"><b class="' +
-        (t.passed ? "good" : "bad") +
-        '">' +
-        (t.passed ? "Pass" : "Check") +
-        "</b> <code>" +
-        esc(pretty(t.args)) +
-        "</code><br>Expected <code>" +
-        esc(pretty(t.expected)) +
-        "</code> · Returned <code>" +
-        esc(pretty(t.actual)) +
-        "</code></div>",
-    )
-    .join("");
+function pyValue(value) {
+  if (Array.isArray(value)) return "[" + value.map(pyValue).join(", ") + "]";
+  if (value === null) return "None";
+  if (typeof value === "boolean") return value ? "True" : "False";
+  return typeof value === "string" ? JSON.stringify(value) : String(value);
+}
+function testList(problem, results = null) {
+  return '<ol class="bench-cases">' + (results || problem.tests).map((test, i) => {
+    const call = problem.functionName + "(" + test.args.map(pyValue).join(", ") + ")";
+    const state = results ? (test.passed ? "pass" : "fail") : "example";
+    const result = test.actual;
+    const actual = typeof result === "string" && /^raises [A-Za-z]+Error$/.test(result)
+      ? result : pyValue(result);
+    const badge = results
+      ? '<span class="bench-state ' + state + '">' + (test.passed ? "✓ Pass" : "× Fail") + '</span>'
+      : '<span class="bench-index">' + String(i + 1).padStart(2, "0") + '</span>';
+    return '<li class="bench-case ' + state + '">' + badge + '<div><code>' + esc(call) +
+      ' <span aria-label="returns">→</span> ' + esc(pyValue(test.expected)) + '</code>' +
+      (state === "fail" ? '<dl class="case-diff"><dt>Expected</dt><dd><code>' +
+        esc(pyValue(test.expected)) + '</code></dd><dt>Returned</dt><dd><code>' +
+        esc(actual) + '</code></dd></dl>' : '') + '</div></li>';
+  }).join("") + '</ol>';
 }
 async function editor(id, visit) {
   const p = (await catalog()).find((x) => x.id === id);
@@ -251,22 +259,11 @@ async function editor(id, visit) {
       esc(p.description) +
       '</p><div class="cols"><section class="panel"><div class="bar"><span class="file"><span class="dot"></span>' +
       esc(p.functionName) +
-      '.py</span><span class="mini">Python</span></div><label class="skip" for="editor">Python solution</label><textarea class="editor" id="editor" aria-label="Python solution" spellcheck="false" autocapitalize="off" autocomplete="off">' +
+      '.py</span><span class="mini">Python</span></div><div id="code-host"></div><textarea class="editor" id="editor-fallback" aria-label="Python solution" spellcheck="false" autocapitalize="off" autocomplete="off">' +
       esc(draft) +
-      '</textarea><div class="bar"><span class="hint">Draft saved on this device</span><button class="btn" id="test">▷ Run tests</button></div></section><aside class="panel pad"><div class="mini">Test bench</div><h2>Examples</h2><div id="cases">' +
-      (state.tests[id]
-        ? testList(state.tests[id])
-        : p.tests
-            .map(
-              (t) =>
-                '<div class="case"><code>' +
-                esc(pretty(t.args)) +
-                " → " +
-                esc(pretty(t.expected)) +
-                "</code></div>",
-            )
-            .join("")) +
-      '</div><p class="hint" id="status" role="status">Pass the tests to begin a round.</p><details><summary>Round settings</summary>' +
+      '</textarea><div class="bar"><span class="hint">Draft saved on this device</span><button class="btn" id="test">▷ Run tests</button></div></section><aside class="panel pad test-bench"><div class="mini">Test bench</div><h2>Examples</h2><div id="cases">' +
+      testList(p, state.tests[id]) +
+      '</div><p class="runtime-state" id="runtime-state" role="status" data-phase="loading"><span aria-hidden="true"></span>Loading Python on this device…</p><p class="hint" id="status" role="status">Pass the tests to begin a round.</p><details class="round-settings"><summary>Round settings <span aria-hidden="true"></span></summary>' +
       field("Cohort join code (optional)", "cohort", "text", 'maxlength="32"') +
       field(
         "Name for your instructor (optional)",
@@ -280,40 +277,72 @@ async function editor(id, visit) {
   $("begin").disabled = !(
     initialTest?.length && initialTest.every((t) => t.passed)
   );
-  $("editor").oninput = () => {
-    state.drafts[id] = $("editor").value;
-    storage.set("draft-" + id, state.drafts[id]);
+  const fallback = $("editor-fallback");
+  let read = () => fallback.value;
+  let lock = value => { fallback.readOnly = value; };
+  let busy = false;
+  const query = new URLSearchParams(location.hash.split("?")[1] || "");
+  if (query.has("cohort")) {
+    $("cohort").value = query.get("cohort").slice(0, 32);
+    main.querySelector(".round-settings").open = true;
+  }
+  function changed(code) {
+    state.drafts[id] = code;
+    storage.set("draft-" + id, code);
     delete state.tests[id];
+    $("cases").innerHTML = testList(p);
     $("begin").disabled = true;
     message("status", "Run tests again after editing.");
-  };
+  }
+  fallback.oninput = () => changed(fallback.value);
+  import("./codemirror.js").then(({ attachEditor }) => {
+    if (visit !== state.visits) return;
+    const editor = attachEditor($("code-host"), fallback.value, changed);
+    lock = editor.lock;
+    read = editor.read;
+    lock(busy);
+    fallback.remove();
+    window.addEventListener("hashchange", editor.destroy, { once: true });
+  }).catch(() => {
+    if (visit === state.visits) message("status", "Plain-text editing is available. Run tests when ready.");
+  });
+  function runtimeStatus(phase, text) {
+    if (visit !== state.visits) return;
+    const status = $("runtime-state");
+    status.dataset.phase = phase;
+    status.lastChild.textContent = text;
+  }
+  const engine = import("./engine-client.js");
+  function warm() {
+    runtimeStatus("loading", "Loading Python on this device…");
+    engine.then(({ preloadPractice }) => preloadPractice()).then(() => {
+      if (!busy) runtimeStatus("ready", "Python ready");
+    }).catch(() => {
+      if (!busy) runtimeStatus("idle", "Run tests to retry loading Python.");
+    });
+  }
+  warm();
   const run = async (mode) => {
-    const source = $("editor").value,
+    const source = read(),
       cohort = $("cohort").value.trim(),
       displayName = $("nickname").value.trim(),
       pace = Number($("pace").value);
     $("test").disabled = $("begin").disabled = true;
-    $("editor").readOnly = true;
+    busy = true;
+    lock(true);
     message("status", "Starting the browser Python engine…");
     try {
-      const { runPractice } = await import("./engine-client.js");
+      const { runPractice } = await engine;
       const result = await runPractice(
         { problem: p, code: source, mode, seed: 42 },
         (msg) => {
-          if (state.visits === visit)
-            message(
-              "status",
-              msg === "loading"
-                ? "Loading Python on this device…"
-                : msg === "running"
-                  ? "Checking your code…"
-                  : String(msg),
-            );
+          if (msg === "loading") runtimeStatus("loading", "Loading Python on this device…");
+          if (msg === "running") runtimeStatus("running", mode === "round" ? "Generating questions…" : "Running tests…");
         },
       );
       if (visit !== state.visits) return;
       state.tests[id] = result.tests;
-      $("cases").innerHTML = testList(result.tests);
+      $("cases").innerHTML = testList(p, result.tests);
       if (mode === "round" && result.probes?.length) {
         const round = {
           problem: p,
@@ -368,7 +397,10 @@ async function editor(id, visit) {
     } finally {
       if (visit === state.visits && $("test")) {
         $("test").disabled = false;
-        $("editor").readOnly = false;
+        busy = false;
+        lock(false);
+        if (mode === "test" && state.tests[id]?.every(t => t.passed)) warm();
+        else runtimeStatus("idle", "Python runs on this device");
         $("begin").disabled = !state.tests[id]?.every((t) => t.passed);
       }
     }
@@ -399,6 +431,28 @@ function tape(round) {
     "</div>"
   );
 }
+function roundSteps(round, current) {
+  const items = round.probes.map((_, i) => {
+    const answer = round.answers[i];
+    const status = answer ? (answer.correct ? "Correct" : "Review") : i === current ? "Current" : "Upcoming";
+    return '<li><button type="button" data-step="' + i + '" class="round-step ' +
+      (answer ? "answered" : i === current ? "current" : "upcoming") + '"' +
+      (i === current ? ' aria-current="step"' : "") + (i > current ? ' disabled' : '') +
+      ' aria-label="Question ' + (i + 1) + ', ' + status + '">' +
+      '<span class="step-number">' + (answer ? (answer.correct ? "✓" : "×") : (i + 1)) +
+      '</span><span>Q' + (i + 1) + '</span></button></li>';
+  }).join("");
+  return '<ol class="round-steps" aria-label="Round progress">' + items +
+    '</ol><div class="step-review" id="step-review" hidden></div>';
+}
+function lineComparison(q) {
+  const changed = q.changedLine ?? q.code.split("\n")[q.line - 1];
+  const original = q.originalLine ?? "Unavailable for this saved round";
+  return '<div class="line-comparison" aria-label="Line ' + esc(q.line) + ' comparison">' +
+    '<div><span>Original line</span><code>' + esc(original.trimStart()) + '</code></div>' +
+    '<div><span>Changed line</span><code>' + esc(changed?.trimStart() || "") + '</code></div></div>';
+}
+let roundKeys;
 function roundPage() {
   const r = state.round;
   if (!r) return resumeNotice();
@@ -418,26 +472,37 @@ function roundPage() {
       esc(r.problem.title) +
       "</h1>" +
       (r.serverError ? '<p class="hint">' + esc(r.serverError) + "</p>" : "") +
-      '<div class="cols"><section class="panel"><div class="bar"><span class="file">Mutation / ' +
+      roundSteps(r, i) +
+      '<div class="cols round-cols"><section class="panel round-source"><div class="bar"><span class="file">' +
       esc(r.problem.functionName) +
-      '.py</span><span class="tag">Line ' +
-      esc(q.line) +
-      "</span></div>" +
-      codeView(q.code, q.line) +
+      '.py</span><span class="tag">Line ' + esc(q.line) + '</span></div>' +
+      codeView(q.code, q.line) + lineComparison(q) +
       '</section><section class="panel pad"><div class="spread"><span class="mini">' +
-      esc(q.kind) +
-      '</span><span class="file">' +
-      (i + 1) +
-      " of " +
-      r.probes.length +
-      '</span></div><div class="fuse"><progress id="fuse" aria-label="Suggested practice time"></progress></div><h2 class="question">' +
-      esc(q.prompt) +
-      "</h2>" +
-      options(q.options, "answer-list") +
-      '<div class="actions"><button class="btn primary" id="submit" disabled>Record answer →</button><button class="link" id="clock"></button></div><p class="hint" id="roundstatus" role="status"></p></section></div><div class="spaced">' +
-      tape(r) +
-      "</div>",
+      (q.kind === "Breaker" ? "Find the breaking input" : "Predict the output") +
+      '</span><span class="file">' + (i + 1) + ' of ' + r.probes.length +
+      '</span></div><div class="fuse"><progress id="fuse" aria-label="Suggested practice time"></progress></div><h2 class="question" tabindex="-1" id="round-question">' +
+      esc(q.prompt) + '</h2>' + options(q.options, "answer-list") +
+      '<p class="shortcut-hint hint">Choose with <kbd>A–D</kbd> or <kbd>1–4</kbd>.</p><div class="actions"><button class="btn primary" id="submit" disabled>Check answer →</button><button class="link" id="clock"></button></div><p class="hint" id="roundstatus" role="status"></p></section></div>',
   );
+  const review = $("step-review");
+  for (const step of main.querySelectorAll("button[data-step]")) {
+    const n = Number(step.dataset.step);
+    step.onclick = () => {
+      if (n === i) {
+        review.hidden = true;
+        $("round-question").focus();
+        return;
+      }
+      const answer = r.answers[n];
+      if (!answer) return;
+      const prev = r.probes[n];
+      review.innerHTML = '<strong>Question ' + (n + 1) + ' · ' + (answer.correct ? "Correct" : "Review") +
+        '</strong><p>' + esc(prev.prompt) + '</p><p>Your answer: <code>' + esc(prev.options[answer.selected]) +
+        '</code> · Correct answer: <code>' + esc(prev.options[prev.correctIndex]) + '</code></p>';
+      review.hidden = false;
+    };
+  }
+  if (i > 0) $("round-question").focus({ preventScroll: true });
   let selected = null;
   const timer = () => {
     if (!$("clock")) return;
@@ -470,6 +535,20 @@ function roundPage() {
         $("submit").disabled = false;
       }),
   );
+  roundKeys?.abort();
+  roundKeys = new AbortController();
+  const controller = roundKeys;
+  window.addEventListener("hashchange", () => controller.abort(), { once: true, signal: controller.signal });
+  document.addEventListener("keydown", event => {
+    if (event.defaultPrevented || event.repeat || event.ctrlKey || event.altKey || event.metaKey ||
+        event.target?.closest?.("input, textarea, select, [contenteditable=true]")) return;
+    const key = event.key.toLowerCase();
+    const index = /^[1-4]$/.test(key) ? Number(key) - 1 : "abcd".indexOf(key);
+    if (key.length !== 1 || index < 0 || !buttons[index] || buttons[index].disabled) return;
+    event.preventDefault();
+    buttons[index].focus();
+    buttons[index].click();
+  }, { signal: controller.signal });
   $("submit").onclick = async () => {
     const elapsedMs = Math.min(86400000, Date.now() - r.questionAt);
     let correct = selected === q.correctIndex;
@@ -509,208 +588,118 @@ function resumeNotice() {
       action("Open library", "library"),
   );
 }
-function resultPage() {
-  const r = state.round;
-  if (!r || r.answers.length !== r.probes.length) return resumeNotice();
-  const score = r.answers.filter((x) => x.correct).length,
-    band =
-      score / r.probes.length >= 0.8
-        ? "Solid"
-        : score / r.probes.length >= 0.4
-          ? "Partial"
-          : "Shaky";
-  main.innerHTML = page(
-    eyebrow("Round review") +
-      '<h1 class="headline">' +
-      esc(band) +
-      ' understanding.</h1><p class="lead">' +
-      score +
-      " of " +
-      r.probes.length +
-      " correct on " +
-      esc(r.problem.title) +
-      ". Review the code changes and the reasoning behind each answer.</p>" +
-      tape(r) +
-      '<div class="rows">' +
-      r.probes
-        .map(
-          (q, i) =>
-            '<details class="case"><summary><b class="' +
-            (r.answers[i].correct ? "good" : "bad") +
-            '">' +
-            (r.answers[i].correct ? "Correct" : "Review") +
-            "</b> · " +
-            esc(q.kind) +
-            " · " +
-            esc(q.prompt) +
-            "</summary>" +
-            codeView(q.code, q.line) +
-            "<p>Your answer <code>" +
-            esc(q.options[r.answers[i].selected]) +
-            "</code> · Correct answer <code>" +
-            esc(q.options[q.correctIndex]) +
-            "</code></p><p>" +
-            esc(q.explanation) +
-            "</p></details>",
-        )
-        .join("") +
-      '</div><div class="actions">' +
-      (r.account
-        ? '<button class="btn primary" id="claim">Open certificate →</button><button class="link" id="erase">Delete attempt</button>'
-        : '<span class="hint">This round was completed locally. A public certificate requires the records service.</span>') +
-      action("Return to library", "library") +
-      '</div><p id="resultstatus" role="status"></p>',
-  );
-  if (!r.account) return;
-  // Closing a completed round records it on the instructor board. Finalization is idempotent.
-  const claim = $("claim"),
-    status = $("resultstatus");
-  if (!r.record) {
-    claim.disabled = true;
-    status.textContent = "Saving your result…";
-    api("/attempts/" + r.account.id + "/finalize", "POST", {}, r.account.token)
-      .then((record) => {
-        r.record = record;
-        saveRound();
-        if (status.isConnected) status.textContent = "Your result is saved.";
-      })
-      .catch((error) => {
-        if (status.isConnected)
-          status.textContent =
-            error.message + " Use Open certificate to retry.";
-      })
-      .finally(() => {
-        claim.disabled = false;
-      });
+const sampleCode = "VCH-SAMPLE";
+const sampleRecord = {
+  code: sampleCode, sample: true, publicName: "A. Rivera", problem: "count-positives",
+  score: 4, total: 5, band: "Solid", issuedAt: "2026-01-15T12:00:00Z",
+  outcomes: ["predict","breaker","predict","breaker","predict"].map((kind,index)=>({kind,correct:index!==2}))
+};
+function recordLabel(count) { return count===5 ? "Certificate of practice" : "Practice record"; }
+function probeLabel(kind) {
+  return ({predict:"Predict the output",breaker:"Find the breaking input",line:"Locate the change"})[String(kind).toLowerCase()] || "Code question";
+}
+function normalizedCode(raw) {
+  let value=String(raw).trim();
+  if(/^https?:\/\//i.test(value)){
+    try {const url=new URL(value);value=decodeURIComponent((url.hash || url.pathname).split("/").filter(Boolean).pop() || "");}
+    catch {return null;}
   }
-  $("claim").onclick = async () => {
-    const b = $("claim");
-    b.disabled = true;
-    try {
-      const record =
-        r.record ||
-        (await api(
-          "/attempts/" + r.account.id + "/finalize",
-          "POST",
-          {},
-          r.account.token,
-        ));
-      r.record = record;
-      saveRound();
-      if (b.isConnected)
-        location.hash = "/verify/" + encodeURIComponent(record.code);
-    } catch (e) {
-      if (b.isConnected) {
-        message("resultstatus", e.message);
-        b.disabled = false;
-      }
+  const compact=value.normalize("NFKC").toUpperCase().replace(/[\s\u2010-\u2015\u2212-]+/gu,"");
+  if(compact==="VCHSAMPLE")return sampleCode;
+  const digits=compact.replace(/^VCH/,"");
+  return /^[0-9A-F]{16}$/.test(digits)?"VCH-"+digits.match(/.{4}/g).join("-"):null;
+}
+function nameControls(r){
+  const mode=r.nameMode || (r.record?.publicName?"full":"private");
+  const choices=[["private","Keep my name private"],["initials","Show my initials"],["full","Show my full name"]];
+  return '<fieldset class="name-preference"><legend>Name on the public record</legend><label class="field">Display preference<select id="name-mode">'+choices.map(([v,label])=>'<option value="'+v+'" '+(v===mode?"selected":"")+'>'+label+'</option>').join("")+'</select></label><label class="field" id="public-field" '+(mode==="private"?"hidden":"")+'><span id="name-label">'+(mode==="initials"?"Your initials":"Your full name")+'</span><input id="public-name" maxlength="80" value="'+esc(r.record?.publicName || "")+'" autocomplete="off"></label><p class="hint">Anyone with the verification link can see the name or initials you choose to share.</p></fieldset>';
+}
+function resultPage() {
+  const r=state.round;
+  if(!r || r.answers.length!==r.probes.length)return resumeNotice();
+  const count=r.answers.length, score=r.answers.filter(x=>x.correct).length;
+  const band=score/count>=.8?"Solid":score/count>=.4?"Partial":"Shaky";
+  const label=recordLabel(count), shortLabel=count===5?"certificate":"practice record";
+  main.innerHTML=page(eyebrow("Round review")+'<h1 class="headline">'+band+' understanding.</h1><p class="lead">'+score+' of '+count+' correct on '+esc(r.problem.title)+'. Review the code changes and the reasoning behind each answer.</p>'+tape(r)+'<div class="rows">'+r.probes.map((q,i)=>'<details class="case"><summary><b class="'+(r.answers[i].correct?'good':'bad')+'">'+(r.answers[i].correct?'Correct':'Review')+'</b> · '+esc(probeLabel(q.kind))+' · '+esc(q.prompt)+'</summary>'+codeView(q.code,q.line)+'<p>Your answer <code>'+esc(q.options[r.answers[i].selected])+'</code> · Correct answer <code>'+esc(q.options[q.correctIndex])+'</code></p><p>'+esc(q.explanation)+'</p></details>').join("")+'</div>'+
+    (r.account?'<section class="record-tools"><h2>'+label+'</h2>'+nameControls(r)+'<div class="actions"><button class="btn primary" type="button" id="claim">Open '+shortLabel+' →</button><button class="link" id="erase">Delete attempt</button></div></section>':'<p class="hint">This round was completed locally. Public verification requires a saved server record.</p>')+
+    '<p id="resultstatus" role="status"></p>'+action("Return to library","library"));
+  if(!r.account)return;
+  const claim=$("claim"),status=$("resultstatus"),mode=$("name-mode"),name=$("public-name");
+  mode.onchange=()=>{
+    if(mode.value==="initials" && name.value.trim()){
+      name.value=name.value.trim().split(/\s+/).map(s=>Array.from(s)[0]).slice(0,8).join("").toLocaleUpperCase();
     }
+    $("public-field").hidden=mode.value==="private";
+    message("name-label",mode.value==="initials"?"Your initials":"Your full name");
+    name.setCustomValidity("");
+    if(mode.value!=="private")name.focus();
   };
-  $("erase").onclick = async () => {
-    if (!confirm("Delete this attempt and its public certificate permanently?"))
-      return;
-    try {
-      await api("/attempts/" + r.account.id, "DELETE", null, r.account.token);
-      r.account = null;
-      saveRound();
-      resultPage();
-      message("resultstatus", "Your server record was deleted.");
-    } catch (e) {
-      message("resultstatus", e.message);
+  name.oninput=()=>name.setCustomValidity("");
+  const finalize=(body)=>api("/attempts/"+r.account.id+"/finalize","POST",body,r.account.token);
+  if(!r.record){
+    claim.disabled=true; status.textContent="Saving your result…";
+    finalize({}).then(rec=>{r.record=rec;saveRound();if(status.isConnected)status.textContent="Your result is saved.";})
+      .catch(err=>{if(status.isConnected)status.textContent=err.message+" Open the record to retry.";})
+      .finally(()=>{claim.disabled=false;});
+  }
+  claim.onclick=async()=>{
+    const publicName=mode.value==="private"?null:name.value.trim();
+    if(mode.value!=="private" && (!publicName || mode.value==="initials"&&!/^[\p{L}\p{M}.\s-]{1,12}$/u.test(publicName))){
+      name.setCustomValidity(mode.value==="initials"?"Enter your initials, up to 12 characters.":"Enter the name you want to share.");name.reportValidity();return;
     }
+    claim.disabled=true;
+    try{
+      r.record=await finalize({publicName});r.nameMode=mode.value;saveRound();
+      if(claim.isConnected)location.hash="/verify/"+encodeURIComponent(r.record.code);
+    }catch(e){if(claim.isConnected){status.textContent=e.message;claim.disabled=false;}}
+  };
+  $("erase").onclick=async()=>{
+    if(!confirm("Permanently delete this attempt and revoke its public record?"))return;
+    try{await api("/attempts/"+r.account.id,"DELETE",null,r.account.token);r.account=null;r.record=null;saveRound();resultPage();message("resultstatus","Your server record was deleted.");}
+    catch(e){status.textContent=e.message;}
   };
 }
-async function verification(code, visit) {
-  main.innerHTML = page(
-    eyebrow("Public verification") +
-      '<h1 class="headline">Verify a result.</h1><p class="lead">Look up the problem, score, and probe outcomes using a certificate code.</p><form class="inputrow slim" id="lookup">' +
-      field(
-        "Certificate code",
-        "code",
-        "text",
-        'placeholder="VCH-…" maxlength="80" required autocomplete="off"',
-      ) +
-      '<button class="btn primary">Verify →</button></form><div class="slim" id="record" role="status"></div>',
-  );
-  $("code").value = code || "";
-  $("lookup").onsubmit = (e) => {
-    e.preventDefault();
-    const next = $("code").value.trim().toUpperCase();
-    if (next === code) verification(code, state.visits);
-    else location.hash = "/verify/" + encodeURIComponent(next);
+function certificateMarkup(cert,problem,url) {
+  const title=recordLabel(cert.outcomes.length);
+  const date=new Date(cert.issuedAt).toLocaleDateString(undefined,{year:"numeric",month:"long",day:"numeric"});
+  return '<article class="cert" aria-labelledby="record-title"><div class="record-heading"><span class="label">'+(cert.sample?"Sample document":"Vouch · Python studio")+'</span><span class="stamp">'+(cert.sample?"SAMPLE":"VOUCH")+'</span></div><h2 id="record-title">'+title+'</h2>'+(cert.publicName?'<p class="record-name">'+esc(cert.publicName)+'</p>':'')+'<p class="record-problem">'+esc(problem)+'</p><div class="record-score"><strong>'+cert.score+' / '+cert.total+'</strong><span>'+esc(cert.band)+' understanding<br>'+esc(date)+'</span></div><ol class="outcome-list">'+cert.outcomes.map(o=>'<li><span>'+esc(probeLabel(o.kind))+'</span><strong>'+(o.correct?"✓ Correct":"× Incorrect")+'</strong></li>').join("")+'</ol><p class="record-disclosure">'+(cert.sample?"This sample illustrates a five-question round. No learner submission is associated with this code.":"Verifies that Vouch recorded this round. It does not prove who wrote the code.")+'</p><div class="record-auth">Verification code</div><code>'+esc(cert.code)+'</code><a class="record-url" href="'+esc(url)+'">'+esc(url)+'</a></article>';
+}
+async function verification(raw,visit) {
+  main.innerHTML=page('<div class="verify-tools">'+eyebrow("Public verification")+'<h1 class="headline">Verify a result.</h1><p class="lead">Enter a record code or paste a verification link to see the recorded outcome.</p><form class="inputrow slim" id="lookup">'+field("Verification code or link","code","text",'placeholder="VCH-XXXX-XXXX-XXXX-XXXX" maxlength="400" required autocomplete="off" autocapitalize="characters"')+'<button class="btn primary">Verify →</button></form><a class="textlink" href="#/verify/'+sampleCode+'">Try a sample certificate →</a></div><div class="record-pane" id="record" role="status"></div>');
+  const code=normalizedCode(raw), input=$("code");
+  input.value=code || raw || "";
+  const invalid=()=>{$("record").innerHTML='<div class="record-notice"><h2>Invalid code format</h2><p>Enter the four groups of letters and numbers after VCH, or paste a complete verification link.</p></div>';};
+  input.onpaste=e=>{
+    const text=e.clipboardData?.getData("text/plain"), parsed=normalizedCode(text);
+    if(parsed){e.preventDefault();input.value=parsed;}
   };
-  if (!code) return;
-  message("record", "Looking up the public record…");
-  try {
-    const cert = await api("/verify/" + encodeURIComponent(code));
-    if (visit !== state.visits) return;
-    const problem =
-      state.problems?.find((p) => p.id === cert.problem)?.title || cert.problem;
-    $("record").innerHTML =
-      '<article class="cert"><div class="spread"><span class="label">Certificate of practice</span><span class="stamp">VOUCH</span></div><h2>' +
-      esc(problem) +
-      '</h2><p class="big-num">' +
-      esc(cert.score) +
-      " / " +
-      esc(cert.total) +
-      "</p><p>" +
-      esc(cert.band) +
-      " · " +
-      esc(
-        new Date(cert.issuedAt).toLocaleDateString(undefined, {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        }),
-      ) +
-      "</p><code>" +
-      esc(cert.code) +
-      "</code><hr><p>" +
-      cert.outcomes
-        .map(
-          (o, i) =>
-            "Probe " +
-            (i + 1) +
-            " · " +
-            esc(o.kind) +
-            " · " +
-            (o.correct ? "Correct" : "Incorrect"),
-        )
-        .join("<br>") +
-      '</p></article><div class="actions"><button class="btn" id="print">Print certificate</button><button class="btn" id="copy">Copy verification link</button></div><p id="copied" role="status"></p>';
-    $("print").onclick = () => window.print();
-    $("copy").onclick = async () => {
-      const url = location.origin + "/v/" + encodeURIComponent(cert.code);
-      try {
-        await navigator.clipboard.writeText(url);
-        message("copied", "Verification link copied.");
-      } catch {
-        message("copied", url);
-      }
-    };
-  } catch (e) {
-    if (visit === state.visits) message("record", e.message);
+  $("lookup").onsubmit=e=>{e.preventDefault();const next=normalizedCode(input.value);if(!next){invalid();return;}input.value=next;if(next===raw)verification(next,state.visits);else location.hash="/verify/"+encodeURIComponent(next);};
+  if(!raw)return;
+  if(!code){invalid();return;}
+  message("record","Looking up the public record…");
+  try{
+    const cert=code===sampleCode?sampleRecord:await api("/verify/"+encodeURIComponent(code));
+    const list=await catalog().catch(()=>[]);
+    if(visit!==state.visits)return;
+    const title=list.find(p=>p.id===cert.problem)?.title || cert.problem;
+    const url=location.origin+"/v/"+encodeURIComponent(cert.code);
+    $("record").innerHTML=certificateMarkup(cert,title,url)+'<div class="actions record-actions"><button class="btn" id="print">Print '+(cert.total===5?'certificate':'practice record')+'</button><button class="btn" id="copy">Copy verification link</button></div><p id="copied" role="status"></p>';
+    $("print").onclick=()=>window.print();
+    $("copy").onclick=async()=>{try{await navigator.clipboard.writeText(url);message("copied","Verification link copied.");}catch{message("copied",url);}};
+  }catch(e){
+    if(visit!==state.visits)return;
+    const [title,detail]=e.status===410?["Record revoked","The record owner deleted this attempt. Its score and learner details are no longer public."]:e.status===404?["Record not found","Check the code against the original record. Verification links expire after 30 days."]:["Verification unavailable",e.message];
+    $("record").innerHTML='<div class="record-notice"><h2>'+title+'</h2><p>'+esc(detail)+'</p></div>';
   }
 }
 function instructorAuth(notice = "") {
   main.innerHTML = page(
     eyebrow("Instructor studio") +
       '<h1 class="headline">Your teaching desk.</h1><p class="lead">Create a cohort, share a join code, and review the concepts worth discussing with your learners.</p><form class="panel pad auth" id="login"><h2>Instructor access</h2>' +
-      field(
-        "Email",
-        "email",
-        "email",
-        'required autocomplete="username" maxlength="254"',
-      ) +
-      field(
-        "Password",
-        "password",
-        "password",
-        'required autocomplete="current-password" maxlength="128"',
-      ) +
+      field("Email", "email", "email", 'required autocomplete="username" maxlength="254" placeholder="you@school.edu"') +
+      field("Password", "password", "password", 'required autocomplete="current-password" maxlength="128" placeholder="Enter your password"') +
       '<p class="hint">For a new account, choose a password with at least 12 characters.</p><div class="actions"><button class="btn primary" value="login">Sign in →</button><button class="btn" value="register">Create account</button></div><p id="authmsg" role="status">' +
-      esc(notice) +
-      "</p></form>",
+      esc(notice) + "</p></form>",
   );
   $("login").onsubmit = async (e) => {
     e.preventDefault();
@@ -731,52 +720,41 @@ function instructorAuth(notice = "") {
     }
   };
 }
+
 async function instructor(visit) {
   let data;
   try {
     data = await api("/cohorts");
   } catch (e) {
-    if (visit === state.visits)
-      instructorAuth(e.status === 401 ? "" : e.message);
+    if (visit === state.visits) instructorAuth(e.status === 401 ? "" : e.message);
     return;
   }
   const list = await catalog();
   if (visit !== state.visits) return;
   main.innerHTML = page(
-    '<div class="spread">' +
-      eyebrow("Instructor studio") +
-      '<button class="btn" id="logout">Sign out</button></div><h1 class="headline">Your cohorts.</h1><div class="cols"><section class="panel pad"><h2>Active cohorts</h2><div class="rows">' +
+    '<div class="spread">' + eyebrow("Instructor studio") +
+      '<button class="btn" id="logout">Sign out</button></div><h1 class="headline">Your cohorts.</h1><div class="cols"><section class="panel pad"><h2>Active cohorts</h2>' +
       (data.cohorts.length
-        ? data.cohorts
-            .map(
-              (c) =>
-                '<a class="row" href="#/cohort/' +
-                encodeURIComponent(c.id) +
-                '"><span>↗</span><strong>' +
-                esc(c.name) +
-                '</strong><span class="file">' +
-                esc(c.joinCode) +
-                "</span></a>",
-            )
-            .join("")
-        : '<p class="copy">Create a cohort to start collecting practice results.</p>') +
-      '</div></section><form class="panel pad" id="create"><h2>Create a cohort</h2>' +
-      field("Cohort name", "name", "text", 'maxlength="80" required') +
-      '<label class="field">Assigned problem<select id="assignment">' +
-      list
-        .map(
-          (p) =>
-            '<option value="' + esc(p.id) + '">' + esc(p.title) + "</option>",
-        )
-        .join("") +
-      '</select></label><button class="btn primary">Create cohort →</button></form></div><p id="manage-status" role="status"></p>',
+        ? '<div class="cohort-list">' + data.cohorts.map((c) => {
+            const assigned = list.find((p) => p.id === c.problem);
+            return '<a class="cohort-list-row" href="#/cohort/' + encodeURIComponent(c.id) + '"><span><strong>' +
+              esc(c.name) + '</strong><small>' + esc(assigned?.title || "Archived problem") +
+              '</small></span><span aria-hidden="true">→</span></a>';
+          }).join('') + '</div>'
+        : '<p class="copy">Set up your first cohort to follow a group through a practice round.</p>' +
+          emptySteps(["Name your cohort and choose a problem.", "Share the join link with your learners.", "Open the board to review their rounds."])) +
+      '</section><form class="panel pad" id="create"><h2>Create a cohort</h2>' +
+      field("Cohort name", "name", "text", 'maxlength="80" placeholder="e.g. Tuesday Python lab" required') +
+      '<label class="field">Assigned problem<span class="cohort-select"><select id="assignment">' +
+      list.map((p) => '<option value="' + esc(p.id) + '">' + esc(p.title) + ' · ' + esc(p.difficulty) + '</option>').join("") +
+      '</select></span></label><button class="btn primary">Create cohort →</button></form></div><p id="manage-status" role="status"></p>',
   );
   $("logout").onclick = async () => {
     try {
       await api("/instructor/logout", "POST", {});
-      instructorAuth();
+      if (visit === state.visits) instructorAuth();
     } catch (e) {
-      message("manage-status", e.message);
+      if (visit === state.visits) message("manage-status", e.message);
     }
   };
   $("create").onsubmit = async (e) => {
@@ -784,72 +762,90 @@ async function instructor(visit) {
     const b = e.submitter;
     b.disabled = true;
     try {
-      const c = await api("/cohorts", "POST", {
-        name: $("name").value.trim(),
-        problem: $("assignment").value,
-      });
-      if (visit === state.visits)
-        location.hash = "/cohort/" + encodeURIComponent(c.id);
+      const c = await api("/cohorts", "POST", {name: $("name").value.trim(), problem: $("assignment").value});
+      if (visit === state.visits) location.hash = "/cohort/" + encodeURIComponent(c.id);
     } catch (err) {
-      message("manage-status", err.message);
+      if (visit === state.visits) message("manage-status", err.message);
     } finally {
       b.disabled = false;
     }
   };
 }
+
 async function cohort(id, visit) {
-  const c = await api("/cohorts/" + encodeURIComponent(id));
+  const path = "/cohorts/" + encodeURIComponent(id);
+  const [c, problems] = await Promise.all([api(path), catalog()]);
   if (visit !== state.visits) return;
+  const assigned = problems.find((p) => p.id === c.problem);
   const rows = c.attempts,
-    attention = rows
-      .filter((a) => a.band === "Shaky" || a.band === "Partial")
-      .sort((a, b) => a.score - b.score);
+    attention = rows.filter((a) => a.band === "Shaky" || a.band === "Partial").sort((a, b) => a.score - b.score);
   main.innerHTML = page(
-    back("instructor", "All cohorts") +
-      eyebrow("Cohort board") +
-      '<h1 class="headline">' +
-      esc(c.name) +
-      '</h1><p class="lead">Assigned problem · ' +
-      esc(c.problem) +
-      '</p><div class="bar"><span class="file">Join code <strong>' +
-      esc(c.joinCode) +
-      '</strong></span><button class="btn" id="refresh">Refresh</button></div><h2 class="sectiontitle">Worth a conversation</h2><p class="note">Invite learners to explain a change they found difficult. Time is context for a conversation and carries no scoring penalty.</p>' +
-      (attention.length
-        ? attention
-            .map(
-              (a) =>
-                '<div class="case">' +
-                esc(a.displayName || "Anonymous learner") +
-                " · " +
-                esc(a.score) +
-                " / " +
-                esc(a.total) +
-                "</div>",
-            )
-            .join("")
-        : '<p class="copy">No completed rounds currently need a follow-up.</p>') +
-      '<h2 class="sectiontitle">Learner results</h2>' +
+    back("instructor", "All cohorts") + eyebrow("Cohort board") +
+      '<h1 class="headline">' + esc(c.name) + '</h1><p class="lead">Assigned problem · ' +
+      esc(assigned?.title || "Archived problem") + '</p>' +
+      '<section class="panel cohort-invite" aria-labelledby="invite-title"><div class="cohort-invite-head"><h2 id="invite-title">Invite learners</h2><button class="textlink cohort-rotate-trigger" id="rotate-code" type="button">Regenerate code</button></div>' +
+      '<div class="bar cohort-invite-tools"><div class="join-token"><span class="mini">Join code</span><span class="file"><strong id="join-code"></strong></span></div>' +
+      '<div class="cohort-invite-actions"><button class="btn" id="copy-code" type="button">Copy code</button><button class="btn" id="copy-join-link" type="button">Copy join link</button><a class="textlink" id="join-link">Open join link ↗</a></div></div>' +
+      '<p id="invite-status" role="status"></p><div id="manual-invite" hidden><label class="field">Select and copy<input id="manual-invite-value" readonly></label></div></section>' +
+      '<dialog id="rotate-dialog" class="cohort-dialog panel pad" aria-labelledby="rotate-heading" aria-describedby="rotate-description"><h2 id="rotate-heading">Regenerate join code?</h2><p id="rotate-description">The current code and join link will stop accepting new learners. Rounds already on the board will stay here.</p><form method="dialog" class="actions"><button class="btn" value="cancel" autofocus>Keep current code</button><button class="btn primary" value="rotate">Regenerate code</button></form></dialog>' +
+      '<div class="cohort-board-title"><h2 class="sectiontitle">' + (rows.length ? 'Worth a conversation' : 'Learner results') +
+      '</h2><button class="btn" id="refresh">Refresh</button></div>' +
       (rows.length
-        ? '<div class="scroll"><table><thead><tr><th>Learner</th><th>Round</th><th>Score</th><th>Band</th></tr></thead><tbody>' +
-          rows
-            .map(
-              (a) =>
-                "<tr><td>" +
-                esc(a.displayName || "Anonymous learner") +
-                "</td><td>" +
-                esc(a.status) +
-                "</td><td>" +
-                esc(a.score ?? "—") +
-                " / " +
-                esc(a.total) +
-                "</td><td>" +
-                esc(a.band || "—") +
-                "</td></tr>",
-            )
-            .join("") +
-          "</tbody></table></div>"
-        : '<p class="copy">Share the join code with learners. Their attempts will appear here.</p>'),
+        ? '<p class="note">Invite learners to explain a change they found difficult. Time is context for a conversation and carries no scoring penalty.</p>' +
+          (attention.length ? attention.map((a) => '<div class="case">' + esc(a.displayName || "Anonymous learner") + ' · ' + esc(a.score) + ' / ' + esc(a.total) + '</div>').join("")
+            : '<p class="copy">No completed rounds currently need a follow-up.</p>') +
+          '<h2 class="sectiontitle">Learner results</h2><div class="scroll"><table><thead><tr><th>Learner</th><th>Round</th><th>Score</th><th>Band</th></tr></thead><tbody>' +
+          rows.map((a) => "<tr><td>" + esc(a.displayName || "Anonymous learner") + "</td><td>" + esc(a.status) + "</td><td>" +
+            esc(a.score ?? "—") + " / " + esc(a.total) + "</td><td>" + esc(a.band || "—") + "</td></tr>").join("") + "</tbody></table></div>"
+        : '<div class="panel pad"><h3>Waiting for the first round</h3>' +
+          emptySteps(["Send the join link or code to your learners.", "Ask each learner to run the tests and begin a round.", "Refresh this board to see their progress."]) + '</div>'),
   );
+
+  function updateInvite() {
+    $("join-code").textContent = groupedJoinCode(c.joinCode);
+    $("join-link").href = new URL('/#/practice/' + encodeURIComponent(c.problem) + '?cohort=' + encodeURIComponent(c.joinCode), location.origin).href;
+    $("manual-invite").hidden = true;
+    $("manual-invite-value").value = "";
+  }
+  updateInvite();
+  async function copy(value, label) {
+    try {
+      await navigator.clipboard.writeText(value);
+      if (visit !== state.visits) return;
+      $("manual-invite").hidden = true;
+      message("invite-status", label + " copied.");
+    } catch {
+      if (visit !== state.visits) return;
+      $("manual-invite").hidden = false;
+      $("manual-invite-value").value = value;
+      $("manual-invite-value").focus();
+      $("manual-invite-value").select();
+      message("invite-status", "Use your device’s Copy command.");
+    }
+  }
+  $("copy-code").onclick = () => copy(groupedJoinCode(c.joinCode), "Join code");
+  $("copy-join-link").onclick = () => copy($("join-link").href, "Join link");
+  const dialog = $("rotate-dialog"), trigger = $("rotate-code");
+  trigger.onclick = () => {
+    dialog.returnValue = "";
+    dialog.showModal();
+  };
+  dialog.onclose = async () => {
+    if (dialog.returnValue !== "rotate") return;
+    trigger.disabled = true;
+    try {
+      const updated = await api(path + "/regenerate-code", "POST", {currentCode: c.joinCode});
+      if (visit !== state.visits) return;
+      c.joinCode = updated.joinCode;
+      updateInvite();
+      message("invite-status", "New join code ready. Share the updated link with learners.");
+    } catch (err) {
+      if (visit === state.visits) message("invite-status", err.message);
+    } finally {
+      trigger.disabled = false;
+      if (visit === state.visits) trigger.focus();
+    }
+  };
   $("refresh").onclick = route;
 }
 function missing() {
@@ -869,7 +865,7 @@ async function route() {
       : location.pathname === "/"
         ? ""
         : location.pathname.slice(1);
-  const [view, slug] = path.split("/");
+  const [view, slug] = path.split("?")[0].split("/");
   let id;
   try {
     id = decodeURIComponent(slug || "");
@@ -890,7 +886,7 @@ async function route() {
   try {
     switch (view) {
       case "":
-        home();
+        await home(visit);
         break;
       case "library":
         await library(visit);
@@ -933,12 +929,17 @@ async function route() {
     if (visit > 1) main.focus({ preventScroll: true });
   }
 }
-document.documentElement.dataset.theme =
-  storage.get("theme") === "light" ? "light" : "dark";
-document.querySelector(".theme").onclick = () => {
-  const next =
-    document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-  document.documentElement.dataset.theme = next;
+const themeButton = document.querySelector(".theme");
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const label = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
+  themeButton.setAttribute("aria-label", label);
+  themeButton.title = label;
+}
+setTheme(storage.get("theme") === "light" ? "light" : "dark");
+themeButton.onclick = () => {
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  setTheme(next);
   storage.set("theme", next);
 };
 document.querySelector(".skip").onclick = (event) => {

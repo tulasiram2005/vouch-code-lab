@@ -1,0 +1,33 @@
+.cohort-list { margin-top: 1.25rem; }
+.cohort-list-row, .cohort-board-title, .cohort-invite-head, .cohort-invite-tools, .cohort-invite-actions {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+}
+.cohort-list-row { border-top: 1px solid var(--line); padding: .9rem 0; }
+.cohort-list-row strong, .cohort-list-row small { display: block; }
+.cohort-list-row small { color: var(--muted); }
+.cohort-steps { padding-left: 1.55rem; margin: 1.1rem 0 .25rem; }
+.cohort-steps li { color: var(--muted); padding: .25rem 0 .25rem .35rem; }
+.cohort-steps li::marker { color: var(--amber); font: 600 .8rem var(--mono); }
+.cohort-select { display: block; position: relative; }
+.cohort-select select { appearance: none; padding-right: 2.25rem; cursor: pointer; }
+.cohort-select::after {
+  content: ""; position: absolute; right: 1rem; top: 43%; width: .5rem; height: .5rem;
+  border: solid var(--amber); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); pointer-events: none;
+}
+.cohort-invite { margin: 1.65rem 0 2.1rem; padding: clamp(1rem, 2vw, 1.75rem); }
+.cohort-invite-head { padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
+.cohort-rotate-trigger { background: none; border: 0; color: var(--muted); padding: .35rem 0; text-underline-offset: .25rem; }
+.cohort-rotate-trigger:hover { text-decoration: underline; color: var(--text); }
+.cohort-invite-tools.bar { padding: 1.15rem 0 0; border: 0; background: transparent; }
+.join-token { display: grid; gap: .3rem; }
+.join-token .mini { color: var(--muted); }
+#join-code { color: var(--amber); font: 600 clamp(1.1rem, 2vw, 1.55rem) var(--mono); letter-spacing: .04em; }
+.cohort-invite-actions { justify-content: flex-start; gap: .6rem; }
+.cohort-invite-actions a { padding: .6rem .15rem; }
+#invite-status { color: var(--muted); margin-bottom: 0; }
+#invite-status:empty { margin: 0; }
+.cohort-board-title { margin: 1.25rem 0; }
+.cohort-board-title .sectiontitle { margin: 0; }
+dialog.cohort-dialog { margin: auto; width: min(28rem, calc(100% - 2.5rem)); color: var(--text); }
+.cohort-dialog::backdrop { background: rgb(0 0 0 / 65%); }
+@media (forced-colors: active) { .cohort-select select { appearance: auto; } .cohort-select::after { display:none; } }

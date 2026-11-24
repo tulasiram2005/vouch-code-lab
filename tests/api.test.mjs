@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import pg from "pg";
 import { handle } from "../server/api.mjs";
 import {
@@ -91,15 +91,10 @@ test(
     process.env.DATABASE_URL = testUrl.href;
     delete process.env.NETLIFY_DB_URL;
     await base.query("SET search_path TO " + schema);
-    await base.query(
-      await readFile(
-        new URL(
-          "../db/migrations/20261121133000_vouch.sql",
-          import.meta.url,
-        ),
-        "utf8",
-      ),
-    );
+    const migrations = new URL("../db/migrations/", import.meta.url);
+    for (const file of (await readdir(migrations)).filter(name => name.endsWith(".sql")).sort()) {
+      await base.query(await readFile(new URL(file, migrations), "utf8"));
+    }
     assert.equal((await call("/readyz")).status, 200);
     const account = {
       email: "teacher@example.test",
@@ -155,6 +150,21 @@ test(
     };
     const attempt = await call("/attempts", "POST", payload);
     assert.equal(attempt.status, 201);
+    const rotationPath = "/cohorts/" + cohort.data.id + "/regenerate-code";
+    const currentCode = cohort.data.joinCode;
+    assert.equal((await call(rotationPath, "POST", { currentCode })).status, 401);
+    assert.equal((await call(rotationPath, "POST", { currentCode }, { cookie: other.cookie })).status, 404);
+    const rotations = await Promise.all([0, 1].map(() => call(rotationPath, "POST", { currentCode }, ownerAuth)));
+    assert.deepEqual(rotations.map((r) => r.status).sort(), [200, 409]);
+    const nextCode = rotations.find((r) => r.status === 200).data.joinCode;
+    assert.match(nextCode, /^[0-9A-F]{12}$/);
+    assert.notEqual(nextCode, currentCode);
+    assert.equal((await call("/attempts", "POST", payload)).status, 404);
+    const grouped = nextCode.toLowerCase().match(/.{4}/g).join("-");
+    const joined = await call("/attempts", "POST", {...payload, cohortCode: grouped});
+    assert.equal(joined.status, 201);
+    assert.equal((await call("/attempts/" + joined.data.id, "DELETE", undefined, {authorization: "Bearer " + joined.data.token})).status, 200);
+
     const path = "/attempts/" + attempt.data.id,
       auth = { authorization: "Bearer " + attempt.data.token };
     assert.equal(
@@ -205,9 +215,24 @@ test(
         .data.attempts[0].elapsedMs,
       135,
     );
+    assert.equal(verify.data.publicName, null);
+    assert.equal((await call(path + "/finalize", "POST", { publicName: "A. Learner" })).status, 401);
+    assert.equal((await call(path + "/finalize", "POST", { publicName: "x".repeat(81) }, auth)).status, 400);
+    for (const publicName of ["AL", "A. Learner", null]) {
+      assert.equal((await call(path+"/finalize", "POST", {publicName}, auth)).status, 200);
+      const publicView = await call("/verify/"+left.data.code);
+      assert.equal(publicView.data.publicName, publicName);
+      assert.equal(publicView.data.total, 2);
+      assert.equal(publicView.data.code, left.data.code);
+    }
     assert.equal((await call(path, "DELETE")).status, 401);
     assert.equal((await call(path, "DELETE", undefined, auth)).status, 200);
-    assert.equal((await call("/verify/" + left.data.code)).status, 404);
+    assert.equal((await call("/verify/" + left.data.code)).status, 410);
+    assert.equal((await call("/verify/VCH-0000-0000-0000-0000")).status,404);
+    const tombstones=await base.query("SELECT * FROM revoked_records");
+    assert.equal(tombstones.rowCount,1);
+    assert.deepEqual(Object.keys(tombstones.rows[0]).sort(),["code_hash","expires_at"]);
+    assert.ok(!JSON.stringify(tombstones.rows[0]).includes(left.data.code));
     assert.equal(
       (await call("/instructor/logout", "POST", undefined, ownerAuth)).status,
       200,

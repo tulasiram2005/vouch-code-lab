@@ -220,6 +220,7 @@ def variants(tree,rng):
 def make_probes(tree,fn,problem,rng):
     tests=problem["tests"]+problem.get("cases",[])
     pool=[t["args"] for t in tests[:12]]
+    original_lines=ast.unparse(tree).splitlines()
     baseline=[invoke(fn,args) for args in pool]
     probes=[]
     used_questions=set()
@@ -263,6 +264,7 @@ def make_probes(tree,fn,problem,rng):
         used_questions.add(signature)
         rng.shuffle(options)
         probes.append(dict(kind=kind,code=source,line=line,prompt=prompt,
+            originalLine=original_lines[line-1],changedLine=source.splitlines()[line-1],
             options=options,correctIndex=options.index(answer),
             explanation=f"For {call(idx)}, the original gives {label(baseline[idx])}. The highlighted version gives {label(outcomes[idx])}."))
         if len(probes)==5: break

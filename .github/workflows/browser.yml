@@ -1,0 +1,50 @@
+name: Browser and accessibility
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'public/**'
+      - 'server/**'
+      - 'tests/**'
+      - 'db/migrations/**'
+      - 'package*.json'
+      - '.github/workflows/browser.yml'
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        width: [360, 768, 1440]
+        theme: [dark, light]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: vouch_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['127.0.0.1:5432:5432']
+        options: --health-cmd pg_isready --health-interval 2s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres@127.0.0.1:5432/vouch_test
+      TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/vouch_test
+      TEST_URL: http://127.0.0.1:4173
+      TEST_WIDTH: ${{ matrix.width }}
+      TEST_THEME: ${{ matrix.theme }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx --no-install playwright install --with-deps chromium --only-shell
+      - run: npm run db:migrate && npm test && node tests/runtime-smoke.cjs
+      - name: Run a learner and instructor journey with axe
+        run: |
+          npm start > /tmp/vouch-server.log 2>&1 &
+          curl --retry 12 --retry-connrefused --retry-delay 1 -fsS "$TEST_URL/api/readyz"
+          npm run test:browser

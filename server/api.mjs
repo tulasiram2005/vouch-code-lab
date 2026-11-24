@@ -96,9 +96,28 @@ async function accounts(req, action) {
   });
   return send({ email }, 200, { "set-cookie": authCookie(raw, 28800) });
 }
-async function cohorts(req, id) {
+const newJoinCode = () => randomBytes(6).toString("hex").toUpperCase();
+function joinCode(input) {
+  const code = field(input, 32).toUpperCase().replace(/[-\s]/g, "");
+  if (!/^[0-9A-F]{12}$/.test(code)) fail(400, "Enter the 12-character cohort code.");
+  return code;
+}
+async function cohorts(req, id, rotate) {
   const owner = await instructor(req),
     db = database();
+  if (rotate) {
+    if (req.method !== "POST") fail(405, "Method is unavailable.");
+    const data = await jsonBody(req);
+    const previous = joinCode(data.currentCode);
+    const result = await db.query(
+      `UPDATE cohorts SET join_code=$4 WHERE id=$1 AND instructor_id=$2 AND join_code=$3 RETURNING ${cohortCols}`,
+      [id, owner, previous, newJoinCode()],
+    );
+    if (result.rowCount) return send(result.rows[0]);
+    const owned = await db.query("SELECT id FROM cohorts WHERE id=$1 AND instructor_id=$2", [id, owner]);
+    if (!owned.rowCount) fail(404, "Cohort unavailable.");
+    fail(409, "The join code has already changed. Refresh the board to see it.");
+  }
   if (req.method === "POST" && !id) {
     const data = await jsonBody(req);
     const result = await db.query(
@@ -108,7 +127,7 @@ async function cohorts(req, id) {
         owner,
         field(data.name, 80),
         problem(data.problem),
-        randomBytes(6).toString("hex").toUpperCase(),
+        newJoinCode(),
       ],
     );
     return send(result.rows[0], 201);
@@ -174,7 +193,7 @@ async function createAttempt(req, key) {
     : "Anonymous learner";
   let cohortId = null;
   if (data.cohortCode) {
-    const code = field(data.cohortCode, 32).toUpperCase();
+    const code = joinCode(data.cohortCode);
     await limit(database(), key, "join/" + code, 600);
     const cohort = (
       await database().query(
@@ -208,7 +227,15 @@ async function attemptAction(req, key, id, index, action) {
     /^Bearer ([\w-]{43})$/i,
   )?.[1];
   if (!raw) fail(401, "Attempt access token required.");
-  const data = action === "answer" ? await jsonBody(req) : null;
+  const data = action === "answer" || (action === "finish" && req.body) ? await jsonBody(req) : null;
+  let publicName;
+  if (action === "finish" && data && Object.hasOwn(data, "publicName")) {
+    publicName = data.publicName;
+    if (publicName !== null) {
+      publicName = field(publicName, 80);
+      if (/[\p{C}]/u.test(publicName)) fail(400, "Use a printable name or initials.");
+    }
+  }
   return transaction(async (client) => {
     const a = (
       await client.query(
@@ -218,6 +245,12 @@ async function attemptAction(req, key, id, index, action) {
     ).rows[0];
     if (!a) fail(404, "Attempt unavailable.");
     if (action === "delete") {
+      if (a.certificate) {
+        await client.query(
+          "INSERT INTO revoked_records(code_hash,expires_at) SELECT $1,created_at+interval '30 days' FROM attempts WHERE id=$2 ON CONFLICT DO NOTHING",
+          [hash(a.certificate), id],
+        );
+      }
       await client.query("DELETE FROM attempts WHERE id=$1", [id]);
       return send({ deleted: true });
     }
@@ -263,19 +296,25 @@ async function attemptAction(req, key, id, index, action) {
         "UPDATE attempts SET issued_at=now(),certificate=$2 WHERE id=$1",
         [id, code],
       );
-    return send({ code, score, total, band: grade(score, total) });
+    if (publicName !== undefined && publicName !== a.public_name) {
+      await client.query("UPDATE attempts SET public_name=$2 WHERE id=$1", [id, publicName]);
+    }
+    return send({ code, score, total, band: grade(score, total), publicName: publicName === undefined ? a.public_name : publicName });
   });
 }
 async function verify(code) {
   const result = await database().query(
-    `SELECT a.certificate AS code,a.problem,a.issued_at AS "issuedAt",p.item->>'kind' AS kind,b.correct,b.elapsed_ms AS "elapsedMs"
+    `SELECT a.certificate AS code,a.problem,a.public_name AS "publicName",a.issued_at AS "issuedAt",p.item->>'kind' AS kind,b.correct,b.elapsed_ms AS "elapsedMs"
     FROM attempts a CROSS JOIN LATERAL jsonb_array_elements(a.probes) WITH ORDINALITY p(item,ord)
     JOIN answers b ON b.attempt_id=a.id AND b.position=p.ord-1
     WHERE certificate=$1 AND a.created_at>now()-interval '30 days' ORDER BY p.ord`,
     [code.toUpperCase()],
   );
-  if (!result.rowCount)
-    fail(404, "This certificate is unavailable or has expired.");
+  if (!result.rowCount) {
+    const revoked = await database().query("SELECT 1 FROM revoked_records WHERE code_hash=$1 AND expires_at>now()", [hash(code.toUpperCase())]);
+    if (revoked.rowCount) fail(410, "This record was revoked.");
+    fail(404, "No current record matches this code.");
+  }
   const { code: stored, problem, issuedAt } = result.rows[0];
   const outcomes = result.rows.map(({ kind, correct, elapsedMs }) => ({
     kind,
@@ -286,6 +325,7 @@ async function verify(code) {
     total = outcomes.length;
   return send({
     code: stored,
+    publicName: result.rows[0].publicName,
     problem,
     issuedAt,
     outcomes,
@@ -299,7 +339,7 @@ const uuid =
 const attemptPattern = new RegExp(
   "^/attempts/" + uuid + "(?:/(finalize)|/answers/([0-4]))?$",
 );
-const cohortPattern = new RegExp("^/cohorts(?:/" + uuid + ")?$");
+const cohortPattern = new RegExp("^/cohorts(?:/" + uuid + "(?:/(regenerate-code))?)?$");
 export async function handle(req, context = {}) {
   try {
     const url = new URL(req.url);
@@ -340,7 +380,7 @@ export async function handle(req, context = {}) {
       fail(405, "Method is unavailable.");
     }
     const c = path.match(cohortPattern);
-    if (c) return await cohorts(req, c[1]);
+    if (c) return await cohorts(req, c[1], c[2]);
     const v = path.match(/^\/verify\/(VCH(?:-[A-F0-9]{4}){4})$/i);
     if (v && method === "GET") return await verify(v[1]);
     fail(404, "Resource unavailable.");

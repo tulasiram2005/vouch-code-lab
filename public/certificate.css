@@ -1,0 +1,28 @@
+.record-tools {max-width:620px;border-top:1px solid var(--line);padding:22px 0}
+.name-preference {border:0;margin:18px 0 0;padding:0}
+.name-preference legend {font-weight:650}
+.record-pane {max-width:720px;margin:28px 0}
+.record-notice {border-left:3px solid var(--amber);padding:12px 18px;background:var(--panel)}
+.record-notice h2 {font-size:26px}.record-notice p {margin:7px 0 0}
+.record-pane .cert {background:#f4f0e4;color:#22241b;padding:clamp(20px,4vw,52px);border:6px double #9d916d;border-radius:0}
+.record-heading,.record-score,.outcome-list li {display:flex;align-items:center;justify-content:space-between;gap:14px}
+.cert h2 {font-size:clamp(32px,5vw,58px);letter-spacing:-.055em;line-height:1.08;margin:27px 0 12px}
+.record-name {font:24px var(--display);margin:8px 0}
+.record-problem {margin:7px 0 16px;color:#565742}
+.record-score {padding:15px 0;border-block:1px solid #aaa185;justify-content:start;gap:24px}
+.record-score strong {font:42px var(--display)}
+.record-score span,.outcome-list,.record-disclosure,.record-url {font-size:14px}
+.outcome-list {padding:0;margin:20px 0;list-style:none}
+.outcome-list li {padding:5px 0;border-bottom:1px solid #d3cdbb}
+.outcome-list strong {font-weight:600;white-space:nowrap}
+.record-disclosure {color:#4e503f}
+.record-auth {font:11px var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.cert>code {font:600 clamp(14px,2vw,19px) var(--mono)}
+.record-url {display:block;overflow-wrap:anywhere;color:#59513b;text-decoration:underline}
+@page {size:A4;margin:18mm}
+@media print {
+  body:has(.cert) > :not(main),body:has(.cert) main .verify-tools,body:has(.cert) main .record-actions,body:has(.cert) #copied {display:none!important}
+  body:has(.cert) main,body:has(.cert) main .page,body:has(.cert) .record-pane {width:100%;max-width:none;min-height:0;margin:0;padding:0}
+  .record-pane .cert {break-inside:avoid;print-color-adjust:exact;-webkit-print-color-adjust:exact;padding:15mm}
+  .record-pane .cert h2 {font-size:34pt}
+}
