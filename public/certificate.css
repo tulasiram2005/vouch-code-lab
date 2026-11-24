@@ -6,7 +6,7 @@
 .record-notice h2 {font-size:26px}.record-notice p {margin:7px 0 0}
 .record-pane .cert {background:#f4f0e4;color:#22241b;padding:clamp(20px,4vw,52px);border:6px double #9d916d;border-radius:0}
 .record-heading,.record-score,.outcome-list li {display:flex;align-items:center;justify-content:space-between;gap:14px}
-.cert h2 {font-size:clamp(32px,5vw,58px);letter-spacing:-.055em;line-height:1.08;margin:27px 0 12px}
+.cert h2 {font-size:clamp(32px,5vw,58px);letter-spacing:-.015em;line-height:1.08;margin:27px 0 12px}
 .record-name {font:24px var(--display);margin:8px 0}
 .record-problem {margin:7px 0 16px;color:#565742}
 .record-score {padding:15px 0;border-block:1px solid #aaa185;justify-content:start;gap:24px}

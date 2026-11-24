@@ -438,9 +438,9 @@ function roundSteps(round, current) {
     return '<li><button type="button" data-step="' + i + '" class="round-step ' +
       (answer ? "answered" : i === current ? "current" : "upcoming") + '"' +
       (i === current ? ' aria-current="step"' : "") + (i > current ? ' disabled' : '') +
-      ' aria-label="Question ' + (i + 1) + ', ' + status + '">' +
-      '<span class="step-number">' + (answer ? (answer.correct ? "✓" : "×") : (i + 1)) +
-      '</span><span>Q' + (i + 1) + '</span></button></li>';
+      ' aria-description="' + status + '">' +
+      (answer ? '<span aria-hidden="true">' + (answer.correct ? "✓" : "×") + '</span>' : '') +
+      '<span>Q' + (i + 1) + '</span></button></li>';
   }).join("");
   return '<ol class="round-steps" aria-label="Round progress">' + items +
     '</ol><div class="step-review" id="step-review" hidden></div>';

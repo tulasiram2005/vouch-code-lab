@@ -77,6 +77,10 @@ try {
   await learner.goto(joinLink);
   const editor = learner.locator(".cm-content");
   await editor.waitFor();
+  await learner.locator(".cm-lineNumbers").waitFor();
+  await learner.locator(".tok-keyword").first().waitFor();
+  await learner.getByText("Python ready", {exact:true}).waitFor();
+  assert.equal(await learner.locator("#cases code").first().evaluate(el => getComputedStyle(el).fontFamily.includes("IBM Plex Mono")), true);
   assert.ok(await learner.locator("#cohort").inputValue());
   assert.ok((await learner.locator("#cases").innerText()).includes("count_positives("));
   await learner.locator("#nickname").fill("Practice learner");
@@ -91,6 +95,12 @@ try {
   await learner.locator("#begin").click({timeout:100000});
   await learner.waitForURL("**/#/round",{timeout:100000});
   await inspect(learner,"round");
+  assert.equal(await learner.locator(".round-step").count(), 5);
+  assert.ok(await learner.locator(".round-step").evaluateAll(steps => steps.every(step => {
+    const {width,height} = step.getBoundingClientRect();
+    return width >= 44 && height >= 44;
+  })));
+  assert.equal(await learner.locator(".line-comparison code").count(), 2);
   for(let i=0;i<5;i++){
     await learner.locator("#round-question").waitFor();
     await learner.keyboard.press(i%2===0?"a":"2");
@@ -115,6 +125,7 @@ try {
   await learner.emulateMedia({media:"screen"});
   await instructor.locator("#refresh").click();
   await instructor.locator("tbody").getByText("completed").waitFor();
+  assert.ok((await instructor.locator("main").innerText()).includes("Count the positives"));
   await inspect(instructor,"board");
   const reviewer = await newVisitor();
   await reviewer.goto(new URL("/#/verify",base).href);

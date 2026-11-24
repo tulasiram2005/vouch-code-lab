@@ -57,6 +57,5 @@
 @media (max-width: 480px) {
   .round-steps { gap: .25rem; }
   .round-step { padding: .35rem .5rem; gap: .3rem; }
-  .round-step .step-number { display: none; }
   .line-comparison > div { padding: .6rem; }
 }
