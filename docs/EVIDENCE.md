@@ -31,3 +31,9 @@ The journeys exercised live Python execution, a deliberately failing implementat
 The API suite passed all six tests, including PostgreSQL integration. All nine Python tests passed. The vendored runtime generated five probes on each of six starters. A local production dependency audit reported zero known vulnerabilities, and Gitleaks found no secrets in its Git history scan.
 
 After deployment, ten production files matched the local release byte for byte, including the app, page markup, social card, favicons and sitemap. The database readiness endpoint and sample route responded successfully. An HTTPS smoke check created a disposable five-answer attempt, published initials, verified the score and initials, deleted the attempt and observed HTTP 410 on the revoked code.
+
+## Repository and deployment review · 24 November 2026
+
+A fresh install, migration and startup on a disposable PostgreSQL database returned readiness. All six API and nine Python tests passed, and each starter generated five probes in the shipped WebAssembly runtime. Rebuilding the editor from source with esbuild 0.28.1 produced a byte-identical bundle.
+
+Gitleaks reported zero findings across all fetched Git refs and in an exported tracked tree with archive inspection enabled to one level. The npm audit of the locked graph reported zero known vulnerabilities. The separate Pyodide distribution is outside npm audit coverage. Deployment checks observed HSTS, a restrictive document CSP, no-store caching on API responses, and HTTP 401 for unauthenticated cohort access. The checked deploy preview returned HTTP 503 with shared sessions unavailable. [Repeat the read-only production check](../tests/live.mjs)

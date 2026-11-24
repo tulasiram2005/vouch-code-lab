@@ -1,6 +1,6 @@
 # Interface references
 
-The editorial headings, amber line highlight, narrow question column and stamp-like certificate follow the supplied “Exam Room” direction. A warm desk surface keeps source code and answers visually connected. The library uses rows so learners can compare problem descriptions without opening each entry.
+The editorial headings, amber line highlight, narrow question column and stamp-like certificate give the studio its exam-room appearance. A warm desk surface keeps source code and answers visually connected. The library uses rows so learners can compare problem descriptions without opening each entry.
 
 The Radix accessibility guide informed the review of focus movement, keyboard access and native control semantics. The interface uses native buttons, details, form labels and a skip link. CodeMirror 6 supplies Python syntax highlighting and line numbers. A native textarea provides editing while the editor bundle loads. The small demo lets a visitor answer a real question before committing to a round.
 
