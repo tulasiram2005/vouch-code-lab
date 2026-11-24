@@ -1,46 +1,26 @@
-# Vouch
+# Vouch Code Lab
 
-Vouch turns a learner’s Python function into a short code-reading exercise. Run the examples, examine a one-line mutation and predict its result or find an input that exposes the change. Each answer has an executable explanation.
+Vouch is a Python code-reading studio for learners and instructors. A learner edits a function, runs its examples, then answers questions about one-line changes to their implementation. An instructor can assign a problem to a cohort and review the recorded outcomes. [Exercise catalog](public/problems.json) · [Generator tests](tests/test_engine.py) · [Cohort and record integration tests](tests/api.test.mjs)
 
-[Open Vouch](https://vouch-code-lab.netlify.app/)
+[Open the studio](https://vouch-code-lab.netlify.app/) · [Problem library](https://vouch-code-lab.netlify.app/#/library) · [Instructor desk](https://vouch-code-lab.netlify.app/#/instructor) · [Sample certificate](https://vouch-code-lab.netlify.app/v/VCH-SAMPLE)
 
-![Vouch on Netlify](docs/screens/production.jpg)
+## Try a round
 
-## Try it
+Open **Count the positives**. Run the examples, then start a round. Compare the original and changed lines, choose an answer with A–D or 1–4, and select **Check answer**. On the result page, choose whether to share initials or a full name. Anyone with the link can look up the recorded round. The record cannot establish who wrote the code. [Browser journey](tests/browser.mjs) · [API contract](docs/API.md)
 
-Open the library and select **Count the positives**. Run the supplied example, then start a round. For a second attempt, change the implementation while preserving its behavior. The next round is generated from the edited function.
+## Technology and verification
+
+| Layer | Implementation | Evidence |
+| --- | --- | --- |
+| Interface | HTML, CSS and browser JavaScript. CodeMirror 6 supplies Python highlighting and line numbers. Gloock, Schibsted Grotesk and IBM Plex Mono are self-hosted. | [Editor setup](editor/) · [Theme and font checks](tests/browser.mjs) |
+| Python | Pyodide runs in a Web Worker. The generator uses Python's AST to mutate code and compare executions. | [Shipped WebAssembly smoke test](tests/runtime-smoke.cjs) · [Generator evaluation](tests/evaluate.py) |
+| Shared records | Node.js, Netlify Functions, node-postgres and Supabase PostgreSQL. The server uses a private database connection. | [Database integration tests](tests/api.test.mjs) · [Operations and privacy](docs/API.md) |
+| Delivery | GitHub, GitHub Actions and Netlify. Browser checks use Playwright Chromium and axe-core. | [Browser workflow](.github/workflows/browser.yml) · [Recorded measurements](docs/EVIDENCE.md) |
 
 ## Run locally
 
-Use Node 22+, Python 3.11+ for engine tests, and PostgreSQL for shared records.
+Use Node 22, Python 3.11+ for tests, and PostgreSQL 16 for shared records. Run `npm ci` and `npm start`, then open http://127.0.0.1:4173. Set a server-side `DATABASE_URL` and run `npm run db:migrate` to enable the shared features. The database integration test uses a separate `TEST_DATABASE_URL`. [CI setup and commands](.github/workflows/browser.yml)
 
-```sh
-npm ci
-npm start
-```
+## Project links
 
-Open http://127.0.0.1:4173. For shared records, provide a private server-side DATABASE_URL and run `npm run db:migrate` before starting. Keep connection details out of Git. Netlify Functions use the same server-only variable.
-
-## How a round works
-
-```mermaid
-flowchart LR
-  E[Python editor] --> W[Disposable worker]
-  W --> P[Self-hosted Pyodide]
-  P --> Q[Computed probes]
-  Q --> R[Answer review]
-  R --> A[Same-origin API]
-  A --> D[(PostgreSQL)]
-  D --> C[Certificate and instructor board]
-```
-
-Python source stays on the learner’s device. The browser sends the problem ID, a source fingerprint and choice information when it creates a shared record. A verification link reports the recorded result. The browser controls question generation, so the result is suitable for practice and instructor discussion. It cannot establish authorship.
-
-## Project guide
-
-- [Release status](docs/STATUS.md) and [open work](docs/REMAINING_WORK.md)
-- [API, database operations and privacy](docs/API.md)
-- [Verification evidence](docs/EVIDENCE.md)
-- [Design references and licenses](docs/design/REFERENCES.md)
-
-Codex generated the implementation and exercised the flows recorded in the evidence log. Human classroom evaluation is still open.
+[Release status](docs/STATUS.md) · [Remaining work](docs/REMAINING_WORK.md) · [Design references and licenses](docs/design/REFERENCES.md) · [CodeMirror](https://codemirror.net/) · [Pyodide](https://pyodide.org/) · [PostgreSQL](https://www.postgresql.org/) · [Supabase](https://supabase.com/) · [Netlify](https://www.netlify.com/) · [Playwright](https://playwright.dev/) · [axe-core](https://github.com/dequelabs/axe-core)
