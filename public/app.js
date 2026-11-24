@@ -692,6 +692,14 @@ async function verification(raw,visit) {
     $("record").innerHTML='<div class="record-notice"><h2>'+title+'</h2><p>'+esc(detail)+'</p></div>';
   }
 }
+function groupedJoinCode(code) {
+  return code.match(/.{1,4}/g).join("-");
+}
+
+function emptySteps(steps) {
+  return '<ol class="cohort-steps">' + steps.map((step) => '<li>' + esc(step) + '</li>').join('') + '</ol>';
+}
+
 function instructorAuth(notice = "") {
   main.innerHTML = page(
     eyebrow("Instructor studio") +
