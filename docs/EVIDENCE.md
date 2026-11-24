@@ -15,3 +15,19 @@ On 23 November 2026, `python3 tests/evaluate.py` generated 300 probes across 60 
 Production checks on 23 November 2026 used the Git-backed vouch-code-lab.netlify.app site. The health and readiness endpoints returned HTTP 200. A browser ran the starter tests, generated a five-question round, submitted answers and opened its issued certificate. A separate HTTPS smoke test registered a disposable instructor, signed out and back in, created a cohort, recorded five answers, finalized the result, checked the cohort board and certificate, then deleted the attempt and verified HTTP 404 on its former certificate. The disposable account was removed after testing.
 
 The production learner screenshot and live round screenshot are in docs/screens. The database connector uses TLS with hostname and provider root certificate verification. The app role is restricted to the private vouch schema and has read-only access to the signing key table.
+
+## Polish release · 24 November 2026
+
+[GitHub Actions run 45424534591](https://github.com/tulasiram2005/vouch-code-lab/actions/runs/45424534591) tested commit `ef37aea`. All six Chromium jobs passed with a disposable PostgreSQL 16 service over HTTPS. Each visited 14 states at one viewport and theme, for 84 axe scans. Axe reported zero violations, and the page-width check found no horizontal overflow above its one-pixel tolerance.
+
+| Viewport | Light | Dark |
+| --- | --- | --- |
+| 360 × 900 | 14 clean scans | 14 clean scans |
+| 768 × 900 | 14 clean scans | 14 clean scans |
+| 1440 × 900 | 14 clean scans | 14 clean scans |
+
+The journeys exercised live Python execution, a deliberately failing implementation, keyboard answers, a round reload, an instructor invitation rotation, opt-in initials, print-media visibility and certificate revocation. Each job checked the loaded Gloock face, the inline code font, CodeMirror Python tokens and line numbers, and 44-pixel step targets. Print checks used Chromium print emulation. Physical printing, Safari, Firefox and assistive-technology walkthroughs were outside this matrix.
+
+The API suite passed all six tests, including PostgreSQL integration. All nine Python tests passed. The vendored runtime generated five probes on each of six starters. A local production dependency audit reported zero known vulnerabilities, and Gitleaks found no secrets in its Git history scan.
+
+After deployment, ten production files matched the local release byte for byte, including the app, page markup, social card, favicons and sitemap. The database readiness endpoint and sample route responded successfully. An HTTPS smoke check created a disposable five-answer attempt, published initials, verified the score and initials, deleted the attempt and observed HTTP 410 on the revoked code.

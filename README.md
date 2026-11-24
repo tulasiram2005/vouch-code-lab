@@ -15,7 +15,7 @@ Open **Count the positives**. Run the examples, then start a round. Compare the 
 | Interface | HTML, CSS and browser JavaScript. CodeMirror 6 supplies Python highlighting and line numbers. Gloock, Schibsted Grotesk and IBM Plex Mono are self-hosted. | [Editor setup](editor/) · [Theme and font checks](tests/browser.mjs) |
 | Python | Pyodide runs in a Web Worker. The generator uses Python's AST to mutate code and compare executions. | [Shipped WebAssembly smoke test](tests/runtime-smoke.cjs) · [Generator evaluation](tests/evaluate.py) |
 | Shared records | Node.js, Netlify Functions, node-postgres and Supabase PostgreSQL. The server uses a private database connection. | [Database integration tests](tests/api.test.mjs) · [Operations and privacy](docs/API.md) |
-| Delivery | GitHub, GitHub Actions and Netlify. Browser checks use Playwright Chromium and axe-core. | [Browser workflow](.github/workflows/browser.yml) · [Recorded measurements](docs/EVIDENCE.md) |
+| Delivery | GitHub, GitHub Actions and Netlify. Browser checks use Playwright Chromium and axe-core. | [Browser workflow](.github/workflows/browser.yml) · [Six passing configurations](https://github.com/tulasiram2005/vouch-code-lab/actions/runs/45424534591) · [Recorded measurements](docs/EVIDENCE.md) |
 
 ## Run locally
 
