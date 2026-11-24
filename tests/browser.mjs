@@ -15,7 +15,8 @@ const snapshotDir = process.env.SCREENSHOT_DIR;
 if (snapshotDir) await mkdir(snapshotDir, { recursive: true });
 
 async function newVisitor() {
-  const page = await browser.newPage({ viewport: { width, height: 900 }, colorScheme: theme });
+  const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: theme });
+  const page = await context.newPage();
   await page.addInitScript(t => {
     if (!localStorage.getItem("vouch:theme")) localStorage.setItem("vouch:theme", JSON.stringify(t));
   }, theme);
