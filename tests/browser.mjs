@@ -15,11 +15,15 @@ const snapshotDir = process.env.SCREENSHOT_DIR;
 if (snapshotDir) await mkdir(snapshotDir, { recursive: true });
 
 async function newVisitor() {
-  const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: theme });
+  const context = await browser.newContext({ ignoreHTTPSErrors: base.protocol === "https:", viewport: { width, height: 900 }, colorScheme: theme });
   const page = await context.newPage();
   await page.addInitScript(t => {
     if (!localStorage.getItem("vouch:theme")) localStorage.setItem("vouch:theme", JSON.stringify(t));
   }, theme);
+  page.on("response", async response => {
+    if (response.url().includes("/api/") && response.status() >= 400)
+      console.log("API", response.request().method(), new URL(response.url()).pathname, response.status(), (await response.json().catch(()=>({}))).error);
+  });
   page.on("pageerror", error => errors.push(error.message));
   return page;
 }
@@ -88,6 +92,7 @@ try {
   await learner.waitForURL("**/#/round",{timeout:100000});
   await inspect(learner,"round");
   for(let i=0;i<5;i++){
+    await learner.locator("#round-question").waitFor();
     await learner.keyboard.press(i%2===0?"a":"2");
     await learner.getByRole("button",{name:/Check answer/i}).click();
     if(i<4) await learner.getByText((i+2)+" of 5",{exact:true}).waitFor();
@@ -125,7 +130,7 @@ try {
   await reviewer.locator(".cert").getByText("PL",{exact:true}).waitFor();
   await learner.goto(new URL("/#/result",base).href);
   learner.once("dialog",d=>d.accept());
-  await learner.locator("#erase").click();
+  await Promise.all([learner.waitForResponse(r=>r.request().method()==="DELETE" && r.ok()), learner.locator("#erase").click()]);
   await reviewer.goto(new URL("/v/"+certCode,base).href);
   await reviewer.getByRole("heading",{name:"Record revoked"}).waitFor();
   await inspect(reviewer,"revoked");
